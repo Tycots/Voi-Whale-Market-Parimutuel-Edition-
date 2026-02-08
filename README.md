@@ -49,6 +49,9 @@ Set Flat Fee: 2,000 microVoi (0.002 VOI)
 
 If you set the standard 0.001 fee, the transaction will fail.
 
+Resolved Example:
+https://block.voi.network/explorer/application/48679041/transactions
+
 📜 License
 
 This project is licensed under the MIT License—feel free to fork, bet, and build!
