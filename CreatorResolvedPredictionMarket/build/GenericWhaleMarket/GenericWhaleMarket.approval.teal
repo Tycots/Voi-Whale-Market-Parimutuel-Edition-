@@ -1,0 +1,608 @@
+#pragma version 10
+#pragma typetrack false
+
+// algopy.arc4.ARC4Contract.approval_program() -> uint64:
+main:
+    intcblock 0 1 2 100000
+    bytecblock "" "is_resolved" "stakes_a" "stakes_b" "total_a_pool" "total_b_pool" "market_name" "winner" "label_a" "label_b" "house_fee_bp" "mbr_cost"
+    txn ApplicationID
+    bnz main_after_if_else@2
+    // contract.py:9-10
+    // # Market Metadata
+    // self.market_name = String("")
+    bytec 6 // "market_name"
+    bytec_0 // ""
+    app_global_put
+    // contract.py:11
+    // self.label_a = String("")
+    bytec 8 // "label_a"
+    bytec_0 // ""
+    app_global_put
+    // contract.py:12
+    // self.label_b = String("")
+    bytec 9 // "label_b"
+    bytec_0 // ""
+    app_global_put
+    // contract.py:14-15
+    // # Market State
+    // self.total_a_pool = UInt64(0)
+    bytec 4 // "total_a_pool"
+    intc_0 // 0
+    app_global_put
+    // contract.py:16
+    // self.total_b_pool = UInt64(0)
+    bytec 5 // "total_b_pool"
+    intc_0 // 0
+    app_global_put
+    // contract.py:17
+    // self.is_resolved = False
+    bytec_1 // "is_resolved"
+    intc_0 // 0
+    app_global_put
+    // contract.py:18
+    // self.winner = UInt64(0) # 1 = Side A, 2 = Side B
+    bytec 7 // "winner"
+    intc_0 // 0
+    app_global_put
+    // contract.py:20-21
+    // # Constants
+    // self.house_fee_bp = UInt64(200) # 2% House Fee
+    bytec 10 // "house_fee_bp"
+    pushint 200
+    app_global_put
+    // contract.py:22
+    // self.mbr_cost = UInt64(50_000)  # 0.05 VOI storage fee
+    bytec 11 // "mbr_cost"
+    pushint 50000
+    app_global_put
+
+main_after_if_else@2:
+    // contract.py:3
+    // class GenericWhaleMarket(ARC4Contract):
+    txn NumAppArgs
+    bz main___algopy_default_create@14
+    txn OnCompletion
+    !
+    assert
+    txn ApplicationID
+    assert
+    pushbytess 0x2c757eac 0x0095d546 0x6cf4af47 0xf1577726 0x90a74dd8 // method "initialize_market(string,string,string)void", method "bet(pay,bool)void", method "resolve(uint64)void", method "claim()void", method "withdraw_house_profit()void"
+    txna ApplicationArgs 0
+    match initialize_market bet resolve claim withdraw_house_profit
+    err
+
+main___algopy_default_create@14:
+    txn OnCompletion
+    !
+    txn ApplicationID
+    !
+    &&
+    return
+
+
+// contract.GenericWhaleMarket.initialize_market[routing]() -> void:
+initialize_market:
+    // contract.py:24
+    // @arc4.abimethod
+    txna ApplicationArgs 1
+    dup
+    intc_0 // 0
+    extract_uint16 // on error: invalid array length header
+    intc_2 // 2
+    +
+    dig 1
+    len
+    ==
+    assert // invalid number of bytes for arc4.dynamic_array<arc4.uint8>
+    extract 2 0
+    txna ApplicationArgs 2
+    dup
+    intc_0 // 0
+    extract_uint16 // on error: invalid array length header
+    intc_2 // 2
+    +
+    dig 1
+    len
+    ==
+    assert // invalid number of bytes for arc4.dynamic_array<arc4.uint8>
+    extract 2 0
+    txna ApplicationArgs 3
+    dup
+    intc_0 // 0
+    extract_uint16 // on error: invalid array length header
+    intc_2 // 2
+    +
+    dig 1
+    len
+    ==
+    assert // invalid number of bytes for arc4.dynamic_array<arc4.uint8>
+    extract 2 0
+    // contract.py:27
+    // assert Txn.sender == Global.creator_address, "Only creator can init"
+    txn Sender
+    global CreatorAddress
+    ==
+    assert // Only creator can init
+    // contract.py:28
+    // assert self.market_name == String(""), "Already initialized"
+    intc_0 // 0
+    bytec 6 // "market_name"
+    app_global_get_ex
+    assert // check self.market_name exists
+    bytec_0 // ""
+    ==
+    assert // Already initialized
+    // contract.py:29
+    // self.market_name = name
+    bytec 6 // "market_name"
+    uncover 3
+    app_global_put
+    // contract.py:30
+    // self.label_a = a_name
+    bytec 8 // "label_a"
+    uncover 2
+    app_global_put
+    // contract.py:31
+    // self.label_b = b_name
+    bytec 9 // "label_b"
+    swap
+    app_global_put
+    // contract.py:24
+    // @arc4.abimethod
+    intc_1 // 1
+    return
+
+
+// contract.GenericWhaleMarket.bet[routing]() -> void:
+bet:
+    bytec_0 // ""
+    // contract.py:33
+    // @arc4.abimethod
+    txn GroupIndex
+    intc_1 // 1
+    -
+    dupn 2
+    gtxns TypeEnum
+    intc_1 // pay
+    ==
+    assert // transaction type is pay
+    txna ApplicationArgs 1
+    dup
+    cover 2
+    len
+    intc_1 // 1
+    ==
+    assert // invalid number of bytes for arc4.bool
+    // contract.py:36
+    // assert not self.is_resolved, "Market is closed"
+    intc_0 // 0
+    bytec_1 // "is_resolved"
+    app_global_get_ex
+    assert // check self.is_resolved exists
+    !
+    assert // Market is closed
+    // contract.py:37
+    // assert payment.receiver == Global.current_application_address, "Wrong receiver"
+    gtxns Receiver
+    global CurrentApplicationAddress
+    ==
+    assert // Wrong receiver
+    // contract.py:39-40
+    // # Determine if we need to deduct the one-time 0.05 VOI storage fee
+    // is_new = Txn.sender not in self.stakes_a and Txn.sender not in self.stakes_b
+    bytec_2 // "stakes_a"
+    txn Sender
+    concat
+    box_len
+    bury 1
+    bnz bet_bool_false@4
+    bytec_3 // "stakes_b"
+    txn Sender
+    concat
+    box_len
+    bury 1
+    bnz bet_bool_false@4
+    intc_1 // 1
+
+bet_bool_merge@5:
+    // contract.py:41
+    // net_bet = payment.amount
+    dig 2
+    gtxns Amount
+    bury 4
+    // contract.py:43
+    // if is_new:
+    bz bet_after_if_else@7
+    // contract.py:44
+    // assert payment.amount > self.mbr_cost, "Bet must cover 0.05 VOI storage"
+    intc_0 // 0
+    bytec 11 // "mbr_cost"
+    app_global_get_ex
+    assert // check self.mbr_cost exists
+    dig 3
+    dup
+    cover 2
+    dig 1
+    >
+    assert // Bet must cover 0.05 VOI storage
+    // contract.py:45
+    // net_bet = payment.amount - self.mbr_cost
+    -
+    bury 3
+
+bet_after_if_else@7:
+    // contract.py:47
+    // if side_a.native:
+    dup
+    intc_0 // 0
+    getbit
+    bz bet_else_body@9
+    // contract.py:48
+    // current = self.stakes_a.get(Txn.sender, default=UInt64(0))
+    bytec_2 // "stakes_a"
+    txn Sender
+    concat
+    box_get
+    swap
+    btoi
+    intc_0 // 0
+    swap
+    uncover 2
+    select
+    // contract.py:49
+    // self.stakes_a[Txn.sender] = current + net_bet
+    dig 3
+    dup
+    cover 2
+    +
+    bytec_2 // "stakes_a"
+    txn Sender
+    concat
+    swap
+    itob
+    box_put
+    // contract.py:50
+    // self.total_a_pool += net_bet
+    intc_0 // 0
+    bytec 4 // "total_a_pool"
+    app_global_get_ex
+    assert // check self.total_a_pool exists
+    +
+    bytec 4 // "total_a_pool"
+    swap
+    app_global_put
+
+bet_after_if_else@10:
+    // contract.py:33
+    // @arc4.abimethod
+    intc_1 // 1
+    return
+
+bet_else_body@9:
+    // contract.py:52
+    // current = self.stakes_b.get(Txn.sender, default=UInt64(0))
+    bytec_3 // "stakes_b"
+    txn Sender
+    concat
+    box_get
+    swap
+    btoi
+    intc_0 // 0
+    swap
+    uncover 2
+    select
+    // contract.py:53
+    // self.stakes_b[Txn.sender] = current + net_bet
+    dig 3
+    dup
+    cover 2
+    +
+    bytec_3 // "stakes_b"
+    txn Sender
+    concat
+    swap
+    itob
+    box_put
+    // contract.py:54
+    // self.total_b_pool += net_bet
+    intc_0 // 0
+    bytec 5 // "total_b_pool"
+    app_global_get_ex
+    assert // check self.total_b_pool exists
+    +
+    bytec 5 // "total_b_pool"
+    swap
+    app_global_put
+    b bet_after_if_else@10
+
+bet_bool_false@4:
+    intc_0 // 0
+    b bet_bool_merge@5
+
+
+// contract.GenericWhaleMarket.resolve[routing]() -> void:
+resolve:
+    // contract.py:56
+    // @arc4.abimethod
+    txna ApplicationArgs 1
+    dup
+    len
+    pushint 8
+    ==
+    assert // invalid number of bytes for arc4.uint64
+    btoi
+    dup
+    // contract.py:59
+    // assert Txn.sender == Global.creator_address, "Only creator can resolve"
+    txn Sender
+    global CreatorAddress
+    ==
+    assert // Only creator can resolve
+    // contract.py:60
+    // assert not self.is_resolved, "Already resolved"
+    intc_0 // 0
+    bytec_1 // "is_resolved"
+    app_global_get_ex
+    assert // check self.is_resolved exists
+    !
+    assert // Already resolved
+    // contract.py:61
+    // assert winner_code == UInt64(1) or winner_code == UInt64(2), "Invalid winner code"
+    intc_1 // 1
+    ==
+    bnz resolve_bool_true@3
+    dup
+    intc_2 // 2
+    ==
+    bz resolve_bool_false@4
+
+resolve_bool_true@3:
+    intc_1 // 1
+
+resolve_bool_merge@5:
+    // contract.py:61
+    // assert winner_code == UInt64(1) or winner_code == UInt64(2), "Invalid winner code"
+    assert // Invalid winner code
+    // contract.py:62
+    // self.winner = winner_code
+    bytec 7 // "winner"
+    dig 1
+    app_global_put
+    // contract.py:63
+    // self.is_resolved = True
+    bytec_1 // "is_resolved"
+    intc_1 // 1
+    app_global_put
+    // contract.py:56
+    // @arc4.abimethod
+    intc_1 // 1
+    return
+
+resolve_bool_false@4:
+    intc_0 // 0
+    b resolve_bool_merge@5
+
+
+// contract.GenericWhaleMarket.claim[routing]() -> void:
+claim:
+    bytec_0 // ""
+    // contract.py:68
+    // assert self.is_resolved, "Market not resolved yet"
+    intc_0 // 0
+    bytec_1 // "is_resolved"
+    app_global_get_ex
+    assert // check self.is_resolved exists
+    assert // Market not resolved yet
+    // contract.py:70
+    // total_pool = self.total_a_pool + self.total_b_pool
+    intc_0 // 0
+    bytec 4 // "total_a_pool"
+    app_global_get_ex
+    assert // check self.total_a_pool exists
+    intc_0 // 0
+    bytec 5 // "total_b_pool"
+    app_global_get_ex
+    assert // check self.total_b_pool exists
+    +
+    // contract.py:71-72
+    // # Calculate 2% house cut
+    // fee = (total_pool * self.house_fee_bp) // 10_000
+    intc_0 // 0
+    bytec 10 // "house_fee_bp"
+    app_global_get_ex
+    assert // check self.house_fee_bp exists
+    dig 1
+    *
+    pushint 10000
+    /
+    // contract.py:73
+    // payout_pool = total_pool - fee
+    -
+    // contract.py:75
+    // user_stake = UInt64(0)
+    intc_0 // 0
+    // contract.py:78
+    // if self.winner == UInt64(1):
+    dup
+    bytec 7 // "winner"
+    app_global_get_ex
+    assert // check self.winner exists
+    intc_1 // 1
+    ==
+    bz claim_else_body@5
+    // contract.py:79
+    // winning_side_pool = self.total_a_pool
+    intc_0 // 0
+    bytec 4 // "total_a_pool"
+    app_global_get_ex
+    swap
+    bury 4
+    assert // check self.total_a_pool exists
+    // contract.py:80
+    // if Txn.sender in self.stakes_a:
+    bytec_2 // "stakes_a"
+    txn Sender
+    concat
+    box_len
+    bury 1
+    bz claim_after_if_else@8
+    // contract.py:81
+    // user_stake = self.stakes_a[Txn.sender]
+    bytec_2 // "stakes_a"
+    txn Sender
+    concat
+    box_get
+    assert // check self.stakes_a entry exists
+    btoi
+    bury 1
+    // contract.py:82
+    // del self.stakes_a[Txn.sender]
+    bytec_2 // "stakes_a"
+    txn Sender
+    concat
+    box_del
+    pop
+
+claim_after_if_else@8:
+    // contract.py:89
+    // assert user_stake > 0, "No winning stake found"
+    dupn 2
+    assert // No winning stake found
+    // contract.py:91-92
+    // # Payout = (Your Bet / Total Bets on Winning Side) * Total Pool (minus fee)
+    // payout = (user_stake * payout_pool) // winning_side_pool
+    dig 2
+    *
+    dig 3
+    /
+    // contract.py:94-98
+    // itxn.Payment(
+    //     receiver=Txn.sender,
+    //     amount=payout,
+    //     fee=0
+    // ).submit()
+    itxn_begin
+    // contract.py:95
+    // receiver=Txn.sender,
+    txn Sender
+    itxn_field Receiver
+    itxn_field Amount
+    // contract.py:94
+    // itxn.Payment(
+    intc_1 // pay
+    itxn_field TypeEnum
+    // contract.py:97
+    // fee=0
+    intc_0 // 0
+    itxn_field Fee
+    // contract.py:94-98
+    // itxn.Payment(
+    //     receiver=Txn.sender,
+    //     amount=payout,
+    //     fee=0
+    // ).submit()
+    itxn_submit
+    // contract.py:65
+    // @arc4.abimethod
+    intc_1 // 1
+    return
+
+claim_else_body@5:
+    // contract.py:84
+    // winning_side_pool = self.total_b_pool
+    intc_0 // 0
+    bytec 5 // "total_b_pool"
+    app_global_get_ex
+    swap
+    bury 4
+    assert // check self.total_b_pool exists
+    // contract.py:85
+    // if Txn.sender in self.stakes_b:
+    bytec_3 // "stakes_b"
+    txn Sender
+    concat
+    box_len
+    bury 1
+    bz claim_after_if_else@8
+    // contract.py:86
+    // user_stake = self.stakes_b[Txn.sender]
+    bytec_3 // "stakes_b"
+    txn Sender
+    concat
+    box_get
+    assert // check self.stakes_b entry exists
+    btoi
+    bury 1
+    // contract.py:87
+    // del self.stakes_b[Txn.sender]
+    bytec_3 // "stakes_b"
+    txn Sender
+    concat
+    box_del
+    pop
+    b claim_after_if_else@8
+
+
+// contract.GenericWhaleMarket.withdraw_house_profit[routing]() -> void:
+withdraw_house_profit:
+    // contract.py:103
+    // assert Txn.sender == Global.creator_address
+    txn Sender
+    global CreatorAddress
+    ==
+    assert
+    // contract.py:104
+    // assert self.is_resolved
+    intc_0 // 0
+    bytec_1 // "is_resolved"
+    app_global_get_ex
+    assert // check self.is_resolved exists
+    assert
+    // contract.py:106-107
+    // # Sweep all funds except a tiny 0.1 VOI buffer for contract's own MBR
+    // current_bal = Global.current_application_address.balance
+    global CurrentApplicationAddress
+    acct_params_get AcctBalance
+    assert // account funded
+    // contract.py:108
+    // assert current_bal > 100_000, "Insufficient funds to withdraw"
+    dup
+    intc_3 // 100000
+    >
+    assert // Insufficient funds to withdraw
+    // contract.py:110-114
+    // itxn.Payment(
+    //     receiver=Txn.sender,
+    //     amount=current_bal - 100_000,
+    //     fee=0
+    // ).submit()
+    itxn_begin
+    // contract.py:111
+    // receiver=Txn.sender,
+    txn Sender
+    // contract.py:112
+    // amount=current_bal - 100_000,
+    swap
+    intc_3 // 100000
+    -
+    itxn_field Amount
+    itxn_field Receiver
+    // contract.py:110
+    // itxn.Payment(
+    intc_1 // pay
+    itxn_field TypeEnum
+    // contract.py:113
+    // fee=0
+    intc_0 // 0
+    itxn_field Fee
+    // contract.py:110-114
+    // itxn.Payment(
+    //     receiver=Txn.sender,
+    //     amount=current_bal - 100_000,
+    //     fee=0
+    // ).submit()
+    itxn_submit
+    // contract.py:100
+    // @arc4.abimethod
+    intc_1 // 1
+    return
